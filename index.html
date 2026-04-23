@@ -555,7 +555,7 @@
             <div class="uno-board">
               <div class="uno-deck">
                 <div id="discardPile" class="uno-card blue">START</div>
-                <div id="drawPile" class="uno-card wild">DRAW</div>
+                <button id="drawPile" class="uno-card wild" onclick="drawCard()">DRAW</button>
               </div>
               <div class="player-hand">
                 <h3>Your Hand</h3>
@@ -576,6 +576,14 @@
               Click a piece, then click a highlighted square to move. Basic move
               rules included.
             </p>
+            <div class="button-row mode-selector">
+              <button class="mode-btn active" onclick="setChessMode('human', this)">
+                Human vs Human
+              </button>
+              <button class="mode-btn" onclick="setChessMode('ai', this)">
+                Human vs AI
+              </button>
+            </div>
             <div class="info">
               <div class="score-box">
                 <h3>Turn</h3>
@@ -984,6 +992,8 @@
         selected: null,
         validMoves: [],
         currentPlayer: "white",
+        gameMode: "human",
+        gameOver: false,
       };
 
       const chessBoardElement = document.getElementById("chessboard");
@@ -1002,6 +1012,7 @@
         chess.currentPlayer = "white";
         chess.selected = null;
         chess.validMoves = [];
+        chess.gameOver = false;
         renderChessboard();
       }
 
@@ -1237,6 +1248,107 @@
           const j = Math.floor(Math.random() * (i + 1));
           [array[i], array[j]] = [array[j], array[i]];
         }
+      }
+
+      function setChessMode(mode, button) {
+        chess.gameMode = mode;
+        document.querySelectorAll('#chessPage .mode-btn').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        resetChess();
+      }
+
+      function findKing(color) {
+        for (let row = 0; row < 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const piece = chess.board[row][col];
+            if (piece && piece.toLowerCase() === 'k' && getPieceColor(piece) === color) {
+              return {row, col};
+            }
+          }
+        }
+        return null;
+      }
+
+      function getAttackedSquares(color) {
+        let attacked = [];
+        for (let row = 0; row < 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const piece = chess.board[row][col];
+            if (piece && getPieceColor(piece) === color) {
+              const moves = calculateMoves(row, col);
+              attacked.push(...moves);
+            }
+          }
+        }
+        return attacked;
+      }
+
+      function isSquareAttacked(row, col, byColor) {
+        const opponent = byColor === 'white' ? 'black' : 'white';
+        const attacked = getAttackedSquares(opponent);
+        return attacked.some(pos => pos.row === row && pos.col === col);
+      }
+
+      function isKingInCheck(color) {
+        const kingPos = findKing(color);
+        if (!kingPos) return false;
+        return isSquareAttacked(kingPos.row, kingPos.col, color);
+      }
+
+      function isLegalMove(fromRow, fromCol, toRow, toCol, color) {
+        const piece = chess.board[fromRow][fromCol];
+        const captured = chess.board[toRow][toCol];
+        chess.board[toRow][toCol] = piece;
+        chess.board[fromRow][fromCol] = null;
+        const inCheck = isKingInCheck(color);
+        chess.board[fromRow][fromCol] = piece;
+        chess.board[toRow][toCol] = captured;
+        return !inCheck;
+      }
+
+      function getAllLegalMoves(color) {
+        let allMoves = [];
+        for (let row = 0; row < 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const piece = chess.board[row][col];
+            if (piece && getPieceColor(piece) === color) {
+              const moves = calculateMoves(row, col);
+              for (const move of moves) {
+                if (isLegalMove(row, col, move.row, move.col, color)) {
+                  allMoves.push({fromRow: row, fromCol: col, toRow: move.row, toCol: move.col});
+                }
+              }
+            }
+          }
+        }
+        return allMoves;
+      }
+
+      function checkGameEnd() {
+        const opponent = chess.currentPlayer === 'white' ? 'black' : 'white';
+        if (isKingInCheck(opponent)) {
+          if (getAllLegalMoves(opponent).length === 0) {
+            chessStatus.textContent = `Checkmate! ${chess.currentPlayer} wins!`;
+            chess.gameOver = true;
+          } else {
+            chessStatus.textContent = `${opponent} is in check. ${chess.currentPlayer} to move`;
+          }
+        } else if (getAllLegalMoves(opponent).length === 0) {
+          chessStatus.textContent = `Stalemate!`;
+          chess.gameOver = true;
+        } else {
+          chessStatus.textContent = `${chess.currentPlayer} to move`;
+        }
+      }
+
+      function makeChessAIMove() {
+        const legalMoves = getAllLegalMoves(chess.currentPlayer);
+        if (legalMoves.length === 0) return;
+        const randomMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+        moveChessPiece(randomMove.fromRow, randomMove.fromCol, randomMove.toRow, randomMove.toCol);
+        chess.currentPlayer = chess.currentPlayer === 'white' ? 'black' : 'white';
+        renderChessboard();
+        checkGameEnd();
       }
 
       window.addEventListener("DOMContentLoaded", () => {

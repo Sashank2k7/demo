@@ -1067,6 +1067,9 @@
       }
 
       function handleChessClick(row, col) {
+        if (chess.gameOver) return;
+        if (chess.gameMode === "ai" && chess.currentPlayer === "black") return;
+        
         const piece = chess.board[row][col];
         const selectedPiece = chess.selected
           ? chess.board[chess.selected.row][chess.selected.col]
@@ -1082,6 +1085,11 @@
           chess.validMoves = [];
           chess.currentPlayer = currentColor === "white" ? "black" : "white";
           renderChessboard();
+          checkGameEnd();
+          
+          if (chess.gameMode === "ai" && chess.currentPlayer === "black" && !chess.gameOver) {
+            setTimeout(makeChessAIMove, 600);
+          }
           return;
         }
 
